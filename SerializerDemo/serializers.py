@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from SerializerDemo.models import Student
+from SerializerDemo.models import Teacher
 
 
 def check_sex(value):
@@ -21,8 +22,9 @@ class StudentSerializer(serializers.Serializer):
     2、反序列化的校验器，即校验前端传入的字段
     3、反序列化模型操作的方法，create和update方法
     """
-    # read_only=True,在客户端提交数据[反序列化阶段不要求ID字段]
+    # read_only=True,在客户端提交数据[反序列化阶段]不要求ID字段
     id = serializers.IntegerField(read_only=True)
+    date_joined = serializers.DateTimeField(read_only=True)
     # required=True,反序列化阶段必填
     name = serializers.CharField(required=True)
     # 最大值 max_value 和最小值 min_value
@@ -55,10 +57,10 @@ class StudentSerializer(serializers.Serializer):
 
         return data
 
+    # 全局钩子
     def validate(self, attrs):
         """
         验证来自客户端的所有字段
-
         """
         if not attrs['active'] and attrs['description']:
             raise serializers.ValidationError(
@@ -81,5 +83,43 @@ class StudentSerializer(serializers.Serializer):
         """
         保存数据
         """
-        student = Student.objects.create(**validated_data)
-        return student
+        return Student.objects.create(**validated_data)
+
+
+class TeacherModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        # 1、指定对应的 Django 模型，必填
+        model = Teacher
+        # 2、声明转换字段必填，如果需要全部转换可以设置为 __all__
+        # fields = '__all__'
+        fields = ['id', 'name', 'age', 'sex', 'date_joined', 'active']
+        # read_only_fields指明只读字段，即仅用于序列化输出的字段
+        read_only_fields = ['id', 'date_joined']
+        # 也可以使用exclude可以明确排除掉哪些字段
+        # exclude = ['id']
+        # 字段额外选项信息，如错误的提示信息，选填
+        extra_kwargs = {
+            "name": {
+                'required': True
+            },
+            "age": {
+                "max_value": 60,
+                "min_value": 5,
+                "error_messages": {
+                    "max_value": "must younger than 60",
+                    "min_value": "must older than 5",
+                }
+            }
+        }
+
+    # 全局钩子
+    def validate(self, attrs):
+        """
+        验证来自客户端的所有字段
+        """
+        if not attrs['active'] and attrs['description']:
+            raise serializers.ValidationError(
+                detail='非active老师需要添加描述',
+                code='validate'
+            )
+        return attrs
